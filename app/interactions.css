@@ -1,0 +1,409 @@
+/* Motion layer for the admin dashboard */
+
+:root {
+  --ease-out-quart: cubic-bezier(.25, 1, .5, 1);
+  --ease-spring: cubic-bezier(.2, .8, .2, 1.08);
+}
+
+.live,
+.overview-card,
+.tool-card,
+.tool-icon,
+.workspace-live,
+.stat-box,
+.open-tool,
+.open-tool-arrow,
+.period,
+.metric,
+.count,
+.empty-state,
+.empty-icon,
+.attention-item,
+.tag,
+.status,
+.search-field,
+.search-field svg,
+.filters button,
+.table-wrap,
+tbody tr,
+tbody td,
+.error button {
+  transition-duration: 280ms;
+  transition-timing-function: var(--ease-out-quart);
+}
+
+.live {
+  transition-property: transform, box-shadow, border-color, background-color;
+}
+
+.live:hover {
+  transform: translateY(-2px);
+  border-color: #cfd8e6;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(16, 24, 40, .08);
+}
+
+.live-dot {
+  animation: livePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(18, 183, 106, .12); }
+  50% { box-shadow: 0 0 0 9px rgba(18, 183, 106, 0); }
+}
+
+.overview-card {
+  transition-property: transform, box-shadow, border-color;
+}
+
+.overview-card::after {
+  transition: transform 480ms var(--ease-out-quart), opacity 320ms ease;
+}
+
+.overview-card:hover {
+  transform: translateY(-5px);
+  border-color: #d7dee8;
+  box-shadow: 0 18px 36px rgba(16, 24, 40, .09);
+}
+
+.overview-card:hover::after {
+  transform: translate(-8px, 8px) scale(1.16);
+  opacity: .23;
+}
+
+.overview-icon {
+  transition: transform 320ms var(--ease-spring), box-shadow 280ms ease;
+}
+
+.overview-card:hover .overview-icon {
+  transform: translateY(-2px) scale(1.08);
+  box-shadow: 0 7px 14px rgba(16, 24, 40, .08);
+}
+
+.overview-value {
+  transition: transform 300ms var(--ease-out-quart), color 250ms ease;
+  transform-origin: left center;
+}
+
+.overview-card:hover .overview-value {
+  transform: translateX(3px);
+}
+
+.tool-card {
+  transition: transform 340ms var(--ease-out-quart), box-shadow 340ms var(--ease-out-quart), border-color 260ms ease;
+}
+
+.tool-card:hover {
+  transform: translateY(-6px);
+  border-color: #d5ddea;
+  box-shadow: 0 24px 48px rgba(16, 24, 40, .11);
+}
+
+.tool-card-accent {
+  transform-origin: left center;
+  transition: height 300ms var(--ease-out-quart), filter 300ms ease;
+}
+
+.tool-card:hover .tool-card-accent {
+  height: 5px;
+  filter: saturate(1.12) brightness(1.04);
+}
+
+.tool-icon {
+  transition-property: transform, box-shadow, background-color, border-color;
+  transition-timing-function: var(--ease-spring);
+}
+
+.tool-card:hover .tool-icon {
+  transform: translateY(-3px) rotate(-3deg) scale(1.06);
+  box-shadow: 0 10px 20px rgba(16, 24, 40, .10);
+}
+
+.tool-card-seo:hover .tool-icon {
+  transform: translateY(-3px) rotate(3deg) scale(1.06);
+}
+
+.workspace-live {
+  transition-property: transform, box-shadow;
+}
+
+.tool-card:hover .workspace-live {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(16, 24, 40, .06);
+}
+
+.workspace-live i {
+  animation: workspacePulse 2.8s ease-in-out infinite;
+}
+
+@keyframes workspacePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .6; transform: scale(.78); }
+}
+
+.stat-box {
+  transition-property: transform, border-color, background-color, box-shadow;
+}
+
+.stat-box:hover {
+  transform: translateY(-3px);
+  border-color: #d4dce8 !important;
+  background: #fff !important;
+  box-shadow: 0 10px 22px rgba(16, 24, 40, .07);
+}
+
+.stat-box strong {
+  transition: transform 260ms var(--ease-spring);
+  transform-origin: left center;
+}
+
+.stat-box:hover strong {
+  transform: scale(1.06);
+}
+
+.open-tool {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition-property: transform, box-shadow, filter;
+}
+
+.open-tool::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -80%;
+  left: -35%;
+  width: 28%;
+  height: 260%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .22), transparent);
+  transform: rotate(18deg) translateX(-180%);
+  transition: transform 650ms var(--ease-out-quart);
+}
+
+.open-tool:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px rgba(16, 24, 40, .24);
+  filter: brightness(1.06);
+}
+
+.open-tool:hover::before {
+  transform: rotate(18deg) translateX(600%);
+}
+
+.open-tool:active {
+  transform: translateY(-1px) scale(.995);
+}
+
+.open-tool-arrow {
+  transition-property: transform;
+  transition-timing-function: var(--ease-spring);
+}
+
+.open-tool:hover .open-tool-arrow {
+  transform: translate(3px, -3px) scale(1.08);
+}
+
+.section {
+  transition: border-color 300ms ease, box-shadow 340ms var(--ease-out-quart);
+}
+
+.section:hover {
+  border-color: #dce3ec;
+  box-shadow: 0 16px 36px rgba(16, 24, 40, .07);
+}
+
+.period {
+  transition-property: transform, box-shadow, border-color, background-color;
+}
+
+.period:hover {
+  transform: translateY(-3px);
+  border-color: #d2dbe8;
+  box-shadow: 0 12px 26px rgba(16, 24, 40, .065);
+  background-color: #fff;
+}
+
+.metric {
+  transition-property: transform, border-color;
+}
+
+.period:hover .metric {
+  border-color: #b8c3d4;
+}
+
+.metric:hover {
+  transform: translateX(3px);
+  border-color: #98a2b3 !important;
+}
+
+.metric strong {
+  transition: transform 250ms var(--ease-spring);
+  transform-origin: left center;
+}
+
+.metric:hover strong {
+  transform: scale(1.05);
+}
+
+.count {
+  transition-property: transform, box-shadow, filter;
+}
+
+.count:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 7px 16px rgba(16, 24, 40, .08);
+  filter: saturate(1.08);
+}
+
+.empty-state {
+  transition-property: transform, border-color, background-color, box-shadow;
+}
+
+.empty-state:hover {
+  transform: translateY(-2px);
+  border-color: #cbd6e4;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, .05);
+}
+
+.empty-icon {
+  transition-property: transform, box-shadow;
+  transition-timing-function: var(--ease-spring);
+}
+
+.empty-state:hover .empty-icon {
+  transform: scale(1.08) rotate(-4deg);
+  box-shadow: 0 8px 16px rgba(3, 152, 85, .12);
+}
+
+.attention-item {
+  transition-property: transform, background-color, padding-left, padding-right;
+}
+
+.attention-item:hover {
+  transform: translateX(3px);
+  background: #fffafa;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.attention-item:hover .tag,
+.attention-item:hover .status {
+  transform: scale(1.03);
+}
+
+.search-field {
+  transition-property: border-color, box-shadow, transform, background-color;
+}
+
+.search-field:hover {
+  border-color: #b8c3d4;
+  background: #fff;
+}
+
+.search-field:focus-within {
+  transform: translateY(-1px);
+  border-color: #84adff;
+  box-shadow: 0 0 0 4px rgba(46, 144, 250, .12), 0 8px 18px rgba(16, 24, 40, .05);
+}
+
+.search-field:focus-within svg {
+  stroke: #1570ef;
+  transform: scale(1.08);
+}
+
+.filters button {
+  transition-property: background-color, color, box-shadow, transform;
+}
+
+.filters button:hover:not(.active) {
+  background: #f8fafc;
+  color: #1d2939;
+}
+
+.filters button.active {
+  box-shadow: inset 0 -2px 0 #2e90fa;
+}
+
+.filters button:active {
+  transform: scale(.97);
+}
+
+.table-wrap {
+  transition-property: box-shadow, border-color;
+}
+
+.table-wrap:hover {
+  border-color: #d9e0e9;
+  box-shadow: 0 10px 28px rgba(16, 24, 40, .05);
+}
+
+tbody tr {
+  transition-property: background-color, box-shadow, transform;
+}
+
+tbody tr:hover {
+  position: relative;
+  z-index: 1;
+  background: #f7faff;
+  box-shadow: inset 3px 0 0 #84adff;
+}
+
+tbody tr:hover td {
+  color: #344054;
+}
+
+tbody tr:hover td:first-child strong {
+  color: #101828;
+}
+
+.tag,
+.status {
+  transition-property: transform, box-shadow, filter;
+}
+
+tbody tr:hover .tag,
+tbody tr:hover .status {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(16, 24, 40, .06);
+  filter: saturate(1.05);
+}
+
+.error button {
+  transition-property: transform, box-shadow, filter;
+}
+
+.error button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 18px rgba(180, 35, 24, .18);
+  filter: brightness(1.05);
+}
+
+.error button:active {
+  transform: translateY(0) scale(.98);
+}
+
+@media (hover: none) {
+  .overview-card:hover,
+  .tool-card:hover,
+  .section:hover,
+  .period:hover,
+  .stat-box:hover,
+  .empty-state:hover,
+  .attention-item:hover,
+  .live:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
