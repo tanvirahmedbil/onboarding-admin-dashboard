@@ -23,6 +23,7 @@ export interface ProjectMetrics {
 }
 
 export const toolLabel: Record<ToolType, string> = { dm: "Digital Marketing", seo: "SEO" };
+export const ONBOARDING_MILESTONE_DAYS = 15;
 
 function dateFrom(value: unknown): string | null {
   if (!value) return null;
@@ -34,22 +35,44 @@ function dateFrom(value: unknown): string | null {
   return null;
 }
 
+function milestoneDueDate(startDate: string | null): string | null {
+  if (!startDate) return null;
+  const start = new Date(startDate);
+  if (Number.isNaN(start.getTime())) return null;
+  const due = new Date(start);
+  due.setDate(due.getDate() + ONBOARDING_MILESTONE_DAYS - 1);
+  return due.toISOString();
+}
+
+function ownerFrom(raw: Record<string, unknown>): string | null {
+  if (Array.isArray(raw.assignedMembers)) {
+    const members = raw.assignedMembers.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    if (members.length) return members.join(", ");
+  }
+  if (typeof raw.assignedTeam === "string" && raw.assignedTeam.trim()) return raw.assignedTeam;
+  if (typeof raw.owner === "string" && raw.owner.trim()) return raw.owner;
+  return null;
+}
+
 export function mapProject(id: string, tool: ToolType, raw: Record<string, unknown>): DashboardProject {
+  const startDate = dateFrom(raw.startDate ?? raw.createdAt);
+  const explicitDueDate = dateFrom(raw.dueDate ?? raw.deliveryDate ?? raw.targetDate);
   return {
     id,
     tool,
     clientName: String(raw.clientName ?? raw.client ?? raw.name ?? "Untitled project"),
     status: String(raw.status ?? "active").toLowerCase(),
-    startDate: dateFrom(raw.startDate ?? raw.createdAt),
-    dueDate: dateFrom(raw.dueDate ?? raw.deliveryDate ?? raw.targetDate),
+    startDate,
+    dueDate: explicitDueDate ?? milestoneDueDate(startDate),
     completedAt: dateFrom(raw.completedAt ?? raw.completionDate ?? raw.deliveredAt),
-    owner: typeof raw.assignedTeam === "string" ? raw.assignedTeam : typeof raw.owner === "string" ? raw.owner : null,
+    owner: ownerFrom(raw),
     updatedAt: dateFrom(raw.updatedAt ?? raw.createdAt),
   };
 }
 
 export function isCompleted(project: DashboardProject) {
-  return project.status === "completed" || Boolean(project.completedAt);
+  if (project.status === "completed") return true;
+  return project.status === "archived" && Boolean(project.completedAt);
 }
 
 export function deliveryState(project: DashboardProject): DeliveryState {
@@ -66,11 +89,14 @@ function endOfDay(value: string) {
 export function isInMonth(value: string | null, month: Date) {
   if (!value) return false;
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
   return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
 }
 
 export function isOverdue(project: DashboardProject, now = new Date()) {
-  return !isCompleted(project) && Boolean(project.dueDate) && endOfDay(project.dueDate as string).getTime() < now.getTime();
+  if (project.status === "archived" || isCompleted(project) || !project.dueDate) return false;
+  const due = endOfDay(project.dueDate);
+  return !Number.isNaN(due.getTime()) && due.getTime() < now.getTime();
 }
 
 export function calculateMetrics(projects: DashboardProject[]): ProjectMetrics {
@@ -82,7 +108,7 @@ export function calculateMetrics(projects: DashboardProject[]): ProjectMetrics {
     completed: completed.length,
     timely,
     delayed,
-    active: projects.filter((project) => !isCompleted(project) && project.status !== "archived").length,
+    active: projects.filter((project) => project.status !== "archived" && !isCompleted(project)).length,
     overdue: projects.filter((project) => isOverdue(project)).length,
     onTimeRate: classified ? Math.round((timely / classified) * 100) : null,
   };
