@@ -20,7 +20,7 @@ env:
 
 jobs:
   patch:
-    # Final rerun after connection-state lint fix.
+    # Final release gate after realtime subscription lifecycle fix.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
