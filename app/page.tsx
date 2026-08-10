@@ -1,9 +1,9 @@
 "use client";
 
-import { collection, onSnapshot, type Unsubscribe } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
-import { firebaseConfigured, getDashboardFirestore } from "../lib/firebase";
-import { calculateMetrics, deliveryState, isCompleted, isInMonth, isOverdue, mapProject, shortDate, toolLabel, type DashboardProject, type ToolType } from "../lib/reporting";
+import { firebaseConfigured } from "../lib/firebase";
+import { subscribeDashboard } from "../lib/dashboard-live";
+import { calculateMetrics, deliveryState, isCompleted, isInMonth, isOverdue, shortDate, toolLabel, type DashboardProject, type ToolType } from "../lib/reporting";
 
 type Filter = "all" | ToolType;
 type OverviewIconType = "active" | "overdue" | "completed" | "rate";
@@ -90,53 +90,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!firebaseConfigured) return;
-
-    let dm: DashboardProject[] = [];
-    let seo: DashboardProject[] = [];
-    let dmReady = false;
-    let seoReady = false;
-    let cancelled = false;
-
-    const publish = () => {
-      if (cancelled || !dmReady || !seoReady) return;
-      setProjects([...dm, ...seo]);
-      setLoading(false);
-    };
-
-    let unsubs: Unsubscribe[] = [];
-    try {
-      const db = getDashboardFirestore();
-      unsubs = [
-        onSnapshot(collection(db, "dmProjects"), (snapshot) => {
-          dm = snapshot.docs.map((entry) => mapProject(entry.id, "dm", entry.data()));
-          dmReady = true;
-          publish();
-        }, (reason) => {
-          if (!cancelled) {
-            setError(`Digital Marketing data could not load: ${reason.message}`);
-            setLoading(false);
-          }
-        }),
-        onSnapshot(collection(db, "projects"), (snapshot) => {
-          seo = snapshot.docs.map((entry) => mapProject(entry.id, "seo", entry.data()));
-          seoReady = true;
-          publish();
-        }, (reason) => {
-          if (!cancelled) {
-            setError(`SEO data could not load: ${reason.message}`);
-            setLoading(false);
-          }
-        }),
-      ];
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to connect to Firestore.");
-      setLoading(false);
-    }
-
-    return () => {
-      cancelled = true;
-      unsubs.forEach((unsubscribe) => unsubscribe());
-    };
+    return subscribeDashboard(
+      (nextProjects) => {
+        setProjects(nextProjects);
+        setError(null);
+        setLoading(false);
+      },
+      (message) => {
+        setError(message);
+        setLoading(false);
+      }
+    );
   }, [retryKey]);
 
   const retryConnection = () => {
