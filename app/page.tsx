@@ -1,7 +1,7 @@
 "use client";
 
 import { collection, onSnapshot, type Unsubscribe } from "firebase/firestore";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { firebaseConfigured, getDashboardFirestore } from "../lib/firebase";
 import { calculateMetrics, deliveryState, isCompleted, isInMonth, isOverdue, mapProject, shortDate, toolLabel, type DashboardProject, type ToolType } from "../lib/reporting";
 
@@ -71,36 +71,78 @@ function EmptyAttention() {
   </div>;
 }
 
+function deliveryLabel(project: DashboardProject) {
+  const state = deliveryState(project);
+  if (state === "timely") return "Timely";
+  if (state === "delayed") return "Delayed";
+  if (!project.completedAt) return "Missing completion date";
+  return "Unclassified";
+}
+
 export default function Dashboard() {
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-
-  const subscribe = useCallback(() => {
-    if (!firebaseConfigured) { setError("Firebase configuration is missing. Add the six NEXT_PUBLIC_FIREBASE_* variables in Netlify, then deploy again."); setLoading(false); return () => {}; }
-    setLoading(true); setError(null);
-    let dm: DashboardProject[] = []; let seo: DashboardProject[] = [];
-    const update = () => { setProjects([...dm, ...seo]); setLoading(false); };
-    try {
-      const db = getDashboardFirestore();
-      const unsubs: Unsubscribe[] = [
-        onSnapshot(collection(db, "dmProjects"), (snapshot) => { dm = snapshot.docs.map((doc) => mapProject(doc.id, "dm", doc.data())); update(); }, (reason) => { setError(`Digital Marketing data could not load: ${reason.message}`); setLoading(false); }),
-        onSnapshot(collection(db, "projects"), (snapshot) => { seo = snapshot.docs.map((doc) => mapProject(doc.id, "seo", doc.data())); update(); }, (reason) => { setError(`SEO data could not load: ${reason.message}`); setLoading(false); }),
-      ];
-      return () => unsubs.forEach((unsubscribe) => unsubscribe());
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to connect to Firestore."); setLoading(false); return () => {}; }
-  }, []);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    let cleanup = () => {};
+    if (!firebaseConfigured) {
+      setError("Firebase configuration is missing. Add the six NEXT_PUBLIC_FIREBASE_* variables in Netlify, then deploy again.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    let dm: DashboardProject[] = [];
+    let seo: DashboardProject[] = [];
+    let dmReady = false;
+    let seoReady = false;
     let cancelled = false;
-    void Promise.resolve().then(() => {
-      if (!cancelled) cleanup = subscribe();
-    });
-    return () => { cancelled = true; cleanup(); };
-  }, [subscribe]);
+
+    const publish = () => {
+      if (cancelled || !dmReady || !seoReady) return;
+      setProjects([...dm, ...seo]);
+      setLoading(false);
+    };
+
+    let unsubs: Unsubscribe[] = [];
+    try {
+      const db = getDashboardFirestore();
+      unsubs = [
+        onSnapshot(collection(db, "dmProjects"), (snapshot) => {
+          dm = snapshot.docs.map((entry) => mapProject(entry.id, "dm", entry.data()));
+          dmReady = true;
+          publish();
+        }, (reason) => {
+          if (!cancelled) {
+            setError(`Digital Marketing data could not load: ${reason.message}`);
+            setLoading(false);
+          }
+        }),
+        onSnapshot(collection(db, "projects"), (snapshot) => {
+          seo = snapshot.docs.map((entry) => mapProject(entry.id, "seo", entry.data()));
+          seoReady = true;
+          publish();
+        }, (reason) => {
+          if (!cancelled) {
+            setError(`SEO data could not load: ${reason.message}`);
+            setLoading(false);
+          }
+        }),
+      ];
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to connect to Firestore.");
+      setLoading(false);
+    }
+
+    return () => {
+      cancelled = true;
+      unsubs.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [retryKey]);
 
   const dmProjects = useMemo(() => projects.filter((project) => project.tool === "dm"), [projects]);
   const seoProjects = useMemo(() => projects.filter((project) => project.tool === "seo"), [projects]);
@@ -119,7 +161,7 @@ export default function Dashboard() {
       <div className="live"><span className="live-dot" /><div><strong>{loading ? "Connecting" : "Live data"}</strong><small>Realtime sync</small></div></div>
     </header>
 
-    {error ? <section className="error"><strong>Dashboard connection needs attention</strong><p>{error}</p><button onClick={subscribe}>Retry connection</button></section> : <>
+    {error ? <section className="error"><strong>Dashboard connection needs attention</strong><p>{error}</p><button onClick={() => setRetryKey((value) => value + 1)}>Retry connection</button></section> : <>
       <section className="overview-grid" aria-label="Dashboard overview">
         <OverviewCard type="active" label="Active onboarding" value={overallMetrics.active} note="Across both workspaces" tone="blue" />
         <OverviewCard type="overdue" label="Overdue" value={overallMetrics.overdue} note={overallMetrics.overdue ? "Requires attention" : "No overdue projects"} tone={overallMetrics.overdue ? "red" : "green"} />
@@ -133,7 +175,7 @@ export default function Dashboard() {
       </section>
 
       <section className="section performance-section">
-        <div className="section-heading"><div><p className="eyebrow">DELIVERY PERFORMANCE</p><h2>Monthly completion health</h2></div><p>Timeliness is calculated from completion date versus due date.</p></div>
+        <div className="section-heading"><div><p className="eyebrow">DELIVERY PERFORMANCE</p><h2>Monthly completion health</h2></div><p>Timeliness is calculated against the 15-day onboarding milestone.</p></div>
         <div className="period-grid">
           <div className="period current-period"><div className="period-label"><div><span className="period-kicker">CURRENT PERIOD</span><h3>This month</h3></div><span>{monthLabel}</span></div><div className="metrics"><Metric label="Completed" value={thisMetrics.completed} /><Metric label="Timely" value={thisMetrics.timely} /><Metric label="Delayed" value={thisMetrics.delayed} /><Metric label="On-time rate" value={thisMetrics.onTimeRate === null ? "-" : `${thisMetrics.onTimeRate}%`} /></div></div>
           <div className="period previous-period"><div className="period-label"><div><span className="period-kicker">COMPARISON</span><h3>Last month</h3></div><span>{lastMonth.toLocaleString("en", { month: "long", year: "numeric" })}</span></div><div className="metrics"><Metric label="Completed" value={lastMetrics.completed} /><Metric label="Timely" value={lastMetrics.timely} /><Metric label="Delayed" value={lastMetrics.delayed} /><Metric label="On-time rate" value={lastMetrics.onTimeRate === null ? "-" : `${lastMetrics.onTimeRate}%`} /></div></div>
@@ -147,7 +189,7 @@ export default function Dashboard() {
 
       <section className="section delivery-section">
         <div className="delivery-heading"><div><p className="eyebrow">DELIVERY LOG</p><h2>Completed deliveries</h2><p className="section-description">Review delivered projects across both onboarding workspaces.</p></div><div className="controls"><label className="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg><input aria-label="Search completed deliveries" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search client" /></label><div className="filters">{(["all", "dm", "seo"] as Filter[]).map((value) => <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{value === "all" ? "All" : toolLabel[value]}</button>)}</div></div></div>
-        <div className="table-wrap"><table><thead><tr><th>Client</th><th>Workspace</th><th>Completed</th><th>Due date</th><th>Delivery</th><th>Owner</th></tr></thead><tbody>{deliveries.map((project) => <tr key={`${project.tool}-${project.id}`}><td><strong>{project.clientName}</strong></td><td><span className={`tag ${project.tool}`}>{toolLabel[project.tool]}</span></td><td>{shortDate(project.completedAt)}</td><td>{shortDate(project.dueDate)}</td><td><span className={`status ${deliveryState(project)}`}>{deliveryState(project) === "timely" ? "Timely" : deliveryState(project) === "delayed" ? "Delayed" : "No due date"}</span></td><td>{project.owner ?? "-"}</td></tr>)}{!deliveries.length && <tr><td colSpan={6}><div className="table-empty"><strong>No completed projects found</strong><span>Completed deliveries will appear here automatically.</span></div></td></tr>}</tbody></table></div>
+        <div className="table-wrap"><table><thead><tr><th>Client</th><th>Workspace</th><th>Completed</th><th>Due date</th><th>Delivery</th><th>Owner</th></tr></thead><tbody>{deliveries.map((project) => <tr key={`${project.tool}-${project.id}`}><td><strong>{project.clientName}</strong></td><td><span className={`tag ${project.tool}`}>{toolLabel[project.tool]}</span></td><td>{shortDate(project.completedAt)}</td><td>{shortDate(project.dueDate)}</td><td><span className={`status ${deliveryState(project)}`}>{deliveryLabel(project)}</span></td><td>{project.owner ?? "-"}</td></tr>)}{!deliveries.length && <tr><td colSpan={6}><div className="table-empty"><strong>No completed projects found</strong><span>Completed deliveries will appear here automatically.</span></div></td></tr>}</tbody></table></div>
       </section>
     </>}
 
