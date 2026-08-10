@@ -10,6 +10,7 @@ type OverviewIconType = "active" | "overdue" | "completed" | "rate";
 
 const currentMonth = new Date();
 const lastMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+const missingFirebaseMessage = "Firebase configuration is missing. Add the six NEXT_PUBLIC_FIREBASE_* variables in Netlify, then deploy again.";
 
 function Metric({ label, value, note }: { label: string; value: string | number; note?: string }) {
   return <div className="metric"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>;
@@ -81,21 +82,15 @@ function deliveryLabel(project: DashboardProject) {
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<DashboardProject[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(firebaseConfigured);
+  const [error, setError] = useState<string | null>(firebaseConfigured ? null : missingFirebaseMessage);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    if (!firebaseConfigured) {
-      setError("Firebase configuration is missing. Add the six NEXT_PUBLIC_FIREBASE_* variables in Netlify, then deploy again.");
-      setLoading(false);
-      return;
-    }
+    if (!firebaseConfigured) return;
 
-    setLoading(true);
-    setError(null);
     let dm: DashboardProject[] = [];
     let seo: DashboardProject[] = [];
     let dmReady = false;
@@ -144,6 +139,13 @@ export default function Dashboard() {
     };
   }, [retryKey]);
 
+  const retryConnection = () => {
+    if (!firebaseConfigured) return;
+    setLoading(true);
+    setError(null);
+    setRetryKey((value) => value + 1);
+  };
+
   const dmProjects = useMemo(() => projects.filter((project) => project.tool === "dm"), [projects]);
   const seoProjects = useMemo(() => projects.filter((project) => project.tool === "seo"), [projects]);
   const overallMetrics = useMemo(() => calculateMetrics(projects), [projects]);
@@ -161,7 +163,7 @@ export default function Dashboard() {
       <div className="live"><span className="live-dot" /><div><strong>{loading ? "Connecting" : "Live data"}</strong><small>Realtime sync</small></div></div>
     </header>
 
-    {error ? <section className="error"><strong>Dashboard connection needs attention</strong><p>{error}</p><button onClick={() => setRetryKey((value) => value + 1)}>Retry connection</button></section> : <>
+    {error ? <section className="error"><strong>Dashboard connection needs attention</strong><p>{error}</p>{firebaseConfigured && <button onClick={retryConnection}>Retry connection</button>}</section> : <>
       <section className="overview-grid" aria-label="Dashboard overview">
         <OverviewCard type="active" label="Active onboarding" value={overallMetrics.active} note="Across both workspaces" tone="blue" />
         <OverviewCard type="overdue" label="Overdue" value={overallMetrics.overdue} note={overallMetrics.overdue ? "Requires attention" : "No overdue projects"} tone={overallMetrics.overdue ? "red" : "green"} />
