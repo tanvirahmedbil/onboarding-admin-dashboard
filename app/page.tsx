@@ -88,7 +88,7 @@ export default function Dashboard() {
   const deliveries = useMemo(() => projects.filter((project) => isCompleted(project)).filter((project) => filter === "all" || project.tool === filter).filter((project) => project.clientName.toLowerCase().includes(query.toLowerCase())).sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? "")), [projects, filter, query]);
 
   return <main>
-    <header><div><p className="eyebrow">OPERATIONS OVERVIEW</p><h1>Onboarding Admin Dashboard</h1><p className="subhead">Live delivery reporting across the two independent onboarding workspaces.</p></div><div className="live"><span /> {loading ? "Connecting" : "Live data"}</div></header>
+    <header><div><p className="eyebrow">OPERATIONS OVERVIEW</p><h1>Onboarding SOP - Admin View</h1><p className="subhead">Live delivery reporting across the two independent onboarding workspaces.</p></div><div className="live"><span /> {loading ? "Connecting" : "Live data"}</div></header>
     {error ? <section className="error"><strong>Dashboard connection needs attention</strong><p>{error}</p><button onClick={subscribe}>Retry connection</button></section> : <>
       <section className="tool-grid"><ToolCard tool="dm" projects={dmProjects} /><ToolCard tool="seo" projects={seoProjects} /></section>
       <section className="section"><div className="section-heading"><div><p className="eyebrow">DELIVERY PERFORMANCE</p><h2>Completed projects</h2></div><p>Performance is calculated from completion date versus due date.</p></div>
