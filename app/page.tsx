@@ -13,13 +13,37 @@ function Metric({ label, value, note }: { label: string; value: string | number;
   return <div className="metric"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>;
 }
 
+function WorkspaceIcon({ tool }: { tool: ToolType }) {
+  if (tool === "dm") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13.5V10a2 2 0 0 1 2-2h2.1l7.4-3.2A1.5 1.5 0 0 1 17.6 6v9.5a1.5 1.5 0 0 1-2.1 1.4L8.1 13.7H6a2 2 0 0 1-2-2Z"/><path d="M8 13.7 9.3 19h2.8l-1.6-4.3"/><path d="M20 8.5v4"/></svg>;
+  }
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/><path d="M8.2 10.7 10 12.5l3-3.3"/></svg>;
+}
+
 function ToolCard({ tool, projects }: { tool: ToolType; projects: DashboardProject[] }) {
   const metrics = calculateMetrics(projects);
   const url = tool === "dm" ? process.env.NEXT_PUBLIC_DM_TOOL_URL : process.env.NEXT_PUBLIC_SEO_TOOL_URL;
-  return <article className="tool-card">
-    <div className="card-heading"><div><p className="eyebrow">{tool === "dm" ? "DM WORKSPACE" : "SEO WORKSPACE"}</p><h2>{toolLabel[tool]}</h2></div><span className={`dot ${tool}`} /> </div>
-    <div className="tool-stats"><div><strong>{metrics.active}</strong><span>Active</span></div><div><strong>{metrics.overdue}</strong><span>Overdue</span></div><div><strong>{metrics.onTimeRate === null ? "-" : `${metrics.onTimeRate}%`}</strong><span>On time</span></div></div>
-    {url ? <a className="open-tool" href={url} target="_blank" rel="noreferrer">Open {toolLabel[tool]} tracker <span>↗</span></a> : <p className="missing-link">Add {tool === "dm" ? "NEXT_PUBLIC_DM_TOOL_URL" : "NEXT_PUBLIC_SEO_TOOL_URL"} to enable direct access.</p>}
+  const isDm = tool === "dm";
+
+  return <article className={`tool-card tool-card-${tool}`}>
+    <div className="tool-card-accent" />
+    <div className="card-heading">
+      <div className="tool-card-title-wrap">
+        <div className={`tool-icon ${tool}`}><WorkspaceIcon tool={tool} /></div>
+        <div>
+          <p className="eyebrow">{isDm ? "DM WORKSPACE" : "SEO WORKSPACE"}</p>
+          <h2>{toolLabel[tool]}</h2>
+          <p className="tool-card-subtitle">{isDm ? "Track onboarding progress, workload, and delivery pace." : "Monitor SEO onboarding status, handoffs, and completion health."}</p>
+        </div>
+      </div>
+      <span className={`dot ${tool}`} />
+    </div>
+    <div className="tool-stats enhanced">
+      <div className="stat-box"><strong>{metrics.active}</strong><span>Active</span></div>
+      <div className="stat-box"><strong>{metrics.overdue}</strong><span>Overdue</span></div>
+      <div className="stat-box"><strong>{metrics.onTimeRate === null ? "-" : `${metrics.onTimeRate}%`}</strong><span>On time</span></div>
+    </div>
+    {url ? <a className="open-tool" href={url} target="_blank" rel="noreferrer"><span>Open {toolLabel[tool]} tracker</span><span className="open-tool-arrow">↗</span></a> : <p className="missing-link">Add {tool === "dm" ? "NEXT_PUBLIC_DM_TOOL_URL" : "NEXT_PUBLIC_SEO_TOOL_URL"} to enable direct access.</p>}
   </article>;
 }
 
