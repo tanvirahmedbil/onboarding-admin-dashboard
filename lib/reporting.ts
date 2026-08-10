@@ -35,12 +35,22 @@ function dateFrom(value: unknown): string | null {
   return null;
 }
 
+function parseDate(value: string): Date {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
+}
+
 function milestoneDueDate(startDate: string | null): string | null {
   if (!startDate) return null;
-  const start = new Date(startDate);
+  const start = parseDate(startDate);
   if (Number.isNaN(start.getTime())) return null;
   const due = new Date(start);
   due.setDate(due.getDate() + ONBOARDING_MILESTONE_DAYS - 1);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    const year = due.getFullYear();
+    const month = String(due.getMonth() + 1).padStart(2, "0");
+    const day = String(due.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
   return due.toISOString();
 }
 
@@ -77,18 +87,21 @@ export function isCompleted(project: DashboardProject) {
 
 export function deliveryState(project: DashboardProject): DeliveryState {
   if (!isCompleted(project) || !project.completedAt || !project.dueDate) return "unclassified";
-  return new Date(project.completedAt).getTime() <= endOfDay(project.dueDate).getTime() ? "timely" : "delayed";
+  const completed = parseDate(project.completedAt);
+  const due = endOfDay(project.dueDate);
+  if (Number.isNaN(completed.getTime()) || Number.isNaN(due.getTime())) return "unclassified";
+  return completed.getTime() <= due.getTime() ? "timely" : "delayed";
 }
 
 function endOfDay(value: string) {
-  const date = new Date(value);
+  const date = parseDate(value);
   date.setHours(23, 59, 59, 999);
   return date;
 }
 
 export function isInMonth(value: string | null, month: Date) {
   if (!value) return false;
-  const date = new Date(value);
+  const date = parseDate(value);
   if (Number.isNaN(date.getTime())) return false;
   return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
 }
@@ -116,6 +129,6 @@ export function calculateMetrics(projects: DashboardProject[]): ProjectMetrics {
 
 export function shortDate(value: string | null) {
   if (!value) return "Not set";
-  const date = new Date(value);
+  const date = parseDate(value);
   return Number.isNaN(date.getTime()) ? "Not set" : new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
