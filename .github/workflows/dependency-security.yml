@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install next@16.2.11 eslint-config-next@16.2.11 --save-exact
+      - run: npm install next@16.3.0 eslint-config-next@16.3.0 --save-exact
       - run: npm audit fix
       - run: npm audit --audit-level=high
       - run: npm run lint
