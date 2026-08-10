@@ -1,0 +1,46 @@
+name: Dependency security patch
+
+on:
+  push:
+    paths:
+      - .github/workflows/dependency-security.yml
+
+permissions:
+  contents: write
+
+env:
+  NEXT_PUBLIC_FIREBASE_API_KEY: qc-placeholder
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: qc-placeholder.firebaseapp.com
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: qc-placeholder
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: qc-placeholder.appspot.com
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "123456789"
+  NEXT_PUBLIC_FIREBASE_APP_ID: "1:123456789:web:qcplaceholder"
+  NEXT_PUBLIC_DM_TOOL_URL: https://example.com/dm
+  NEXT_PUBLIC_SEO_TOOL_URL: https://example.com/seo
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install next@16.2.11 eslint-config-next@16.2.11 --save-exact
+      - run: npm audit fix
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm run build
+      - name: Commit patched dependencies
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No dependency changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Patch dependency security advisories"
+          git push
