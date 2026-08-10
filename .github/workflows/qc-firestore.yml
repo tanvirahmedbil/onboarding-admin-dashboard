@@ -1,0 +1,106 @@
+name: Firestore QC audit
+
+on:
+  push:
+    paths:
+      - .github/workflows/qc-firestore.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect project and task data
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime
+
+          PROJECT_ID = "seo-project-onboarding-tracker"
+          ROOT = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
+
+          def list_docs(path):
+              out=[]; token=None
+              while True:
+                  params={"pageSize":"100"}
+                  if token: params["pageToken"]=token
+                  with urllib.request.urlopen(f"{ROOT}/{path}?"+urllib.parse.urlencode(params), timeout=30) as r:
+                      data=json.loads(r.read().decode())
+                  out += data.get("documents",[])
+                  token=data.get("nextPageToken")
+                  if not token: return out
+
+          def value(doc,key):
+              f=doc.get("fields",{}).get(key,{})
+              for k in ("stringValue","timestampValue","booleanValue","integerValue","doubleValue","arrayValue","mapValue"):
+                  if k in f: return f[k]
+              return None
+
+          def arr_strings(v):
+              if not isinstance(v,dict): return []
+              return [x.get("stringValue","") for x in v.get("values",[]) if "stringValue" in x]
+
+          warnings=[]
+          for collection in ("projects","dmProjects"):
+              docs=list_docs(collection)
+              print(f"\nCOLLECTION {collection} projects={len(docs)}")
+              for p in docs:
+                  pid=p["name"].split("/")[-1]
+                  name=value(p,"clientName") or "(unnamed)"
+                  status=value(p,"status") or "active"
+                  start=value(p,"startDate")
+                  completed=value(p,"completedAt")
+                  client_type=value(p,"clientType")
+                  assigned=value(p,"assignedMembers")
+                  tasks=list_docs(f"{collection}/{pid}/tasks")
+                  activity=list_docs(f"{collection}/{pid}/activity")
+                  blocked_done=[]
+                  invalid_targets=[]
+                  phases=set()
+                  standard=0; custom=0
+                  for t in tasks:
+                      title=value(t,"title") or "(untitled)"
+                      phase=value(t,"phase") or ""
+                      phases.add(phase)
+                      is_custom=bool(value(t,"isCustom"))
+                      custom += int(is_custom); standard += int(not is_custom)
+                      completed_task=bool(value(t,"completed"))
+                      task_status=value(t,"status") or "not_started"
+                      if completed_task and task_status=="blocked": blocked_done.append(title)
+                      target=value(t,"dayTarget")
+                      try: target_num=float(target)
+                      except Exception: target_num=0
+                      if target_num <= 0: invalid_targets.append(title)
+                  print(json.dumps({
+                      "id":pid,"client":name,"status":status,"clientType":client_type,
+                      "startDate":start,"completedAt":completed,"tasks":len(tasks),
+                      "standardTasks":standard,"customTasks":custom,"phases":len(phases),
+                      "activity":len(activity),"assignedMembers":arr_strings(assigned)
+                  }, sort_keys=True))
+                  if status=="completed" and not completed:
+                      warnings.append(f"{collection}/{pid} {name}: completed without completedAt")
+                  if status=="active" and completed:
+                      warnings.append(f"{collection}/{pid} {name}: active with stale completedAt")
+                  if blocked_done:
+                      warnings.append(f"{collection}/{pid} {name}: completed tasks still blocked: {blocked_done}")
+                  if invalid_targets:
+                      warnings.append(f"{collection}/{pid} {name}: invalid day targets: {invalid_targets}")
+                  expected = None
+                  if collection=="projects": expected=10
+                  elif client_type=="no_social": expected=11
+                  elif client_type=="has_social": expected=12
+                  if expected is not None and standard != expected:
+                      warnings.append(f"{collection}/{pid} {name}: expected {expected} standard tasks, found {standard}")
+
+          print("\nWARNINGS")
+          if warnings:
+              for w in warnings: print("-",w)
+          else:
+              print("none")
+          print(f"QC_WARNING_COUNT={len(warnings)}")
+          PY
