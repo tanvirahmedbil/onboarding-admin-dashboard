@@ -9,55 +9,76 @@ permissions:
   contents: read
 
 jobs:
-  audit:
+  migrate:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect legacy SEO task anomalies
+      - name: Add missing 15-day milestone due dates
         shell: bash
         run: |
           python3 <<'PY'
           import json
           import urllib.parse
           import urllib.request
-          from collections import Counter
+          from datetime import datetime, timedelta, timezone
+          from zoneinfo import ZoneInfo
 
           PROJECT_ID = "seo-project-onboarding-tracker"
           ROOT = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
-          TARGETS = {
-              "6MSNgXaRoV7CcAKLdj1g": "Igloo",
-              "GqVV077clNQvOZnBsVJ0": "Hatil",
-              "KbGU0qZT1oQKUCMVNiDc": "ABC News",
-              "p6VG6rwp7OrfpuxbSrJ6": "Acme",
-          }
+          DHAKA = ZoneInfo("Asia/Dhaka")
 
-          def list_docs(path):
-              url=f"{ROOT}/{path}?"+urllib.parse.urlencode({"pageSize":"100"})
-              with urllib.request.urlopen(url, timeout=30) as r:
-                  return json.loads(r.read().decode()).get("documents",[])
+          def request(url, method="GET", payload=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type":"application/json"})
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  body=r.read().decode()
+                  return json.loads(body) if body else {}
 
-          def value(doc,key):
-              f=doc.get("fields",{}).get(key,{})
-              for k in ("stringValue","integerValue","booleanValue"):
-                  if k in f: return f[k]
-              return None
+          def list_docs(collection):
+              return request(f"{ROOT}/{collection}?"+urllib.parse.urlencode({"pageSize":"100"})).get("documents",[])
 
-          for pid,name in TARGETS.items():
-              tasks=list_docs(f"projects/{pid}/tasks")
-              rows=[]
-              for t in tasks:
-                  rows.append({
-                      "id":t["name"].split("/")[-1],
-                      "title":value(t,"title"),
-                      "phase":value(t,"phase"),
-                      "order":value(t,"order"),
-                      "dayTarget":value(t,"dayTarget"),
-                      "completed":value(t,"completed"),
-                      "isCustom":value(t,"isCustom"),
-                  })
-              print(f"\nPROJECT {name} {pid} task_count={len(rows)}")
-              for row in sorted(rows, key=lambda r: (int(r["order"] or 0), r["title"] or "")):
-                  print(json.dumps(row, sort_keys=True))
-              counts=Counter((r["title"],r["phase"],r["order"]) for r in rows)
-              duplicates=[{"title":k[0],"phase":k[1],"order":k[2],"count":v} for k,v in counts.items() if v>1]
-              print("DUPLICATES",json.dumps(duplicates,sort_keys=True))
+          def field(doc,key):
+              return doc.get("fields",{}).get(key,{})
+
+          def patch_due(collection, pid, firestore_value):
+              url=f"{ROOT}/{collection}/{pid}?"+urllib.parse.urlencode({"updateMask.fieldPaths":"dueDate"})
+              request(url,"PATCH",{"fields":{"dueDate":firestore_value}})
+
+          changed=[]
+          for doc in list_docs("projects"):
+              if field(doc,"dueDate"):
+                  continue
+              start=field(doc,"startDate").get("timestampValue")
+              if not start:
+                  continue
+              instant=datetime.fromisoformat(start.replace("Z","+00:00"))
+              local=instant.astimezone(DHAKA)
+              due_local=datetime(local.year,local.month,local.day,tzinfo=DHAKA)+timedelta(days=14)
+              due_utc=due_local.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z")
+              pid=doc["name"].split("/")[-1]
+              patch_due("projects",pid,{"timestampValue":due_utc})
+              changed.append(f"projects/{pid}={due_utc}")
+
+          for doc in list_docs("dmProjects"):
+              if field(doc,"dueDate"):
+                  continue
+              start=field(doc,"startDate").get("stringValue")
+              if not start:
+                  continue
+              start_date=datetime.strptime(start[:10],"%Y-%m-%d").date()
+              due=(start_date+timedelta(days=14)).isoformat()
+              pid=doc["name"].split("/")[-1]
+              patch_due("dmProjects",pid,{"stringValue":due})
+              changed.append(f"dmProjects/{pid}={due}")
+
+          print(f"MIGRATED={len(changed)}")
+          for row in changed: print(row)
+
+          missing=[]
+          for collection in ("projects","dmProjects"):
+              for doc in list_docs(collection):
+                  if not field(doc,"dueDate"):
+                      missing.append(doc["name"])
+          print(f"MISSING_DUE_DATE_AFTER={len(missing)}")
+          if missing:
+              raise RuntimeError("Due-date migration incomplete: "+", ".join(missing))
           PY
