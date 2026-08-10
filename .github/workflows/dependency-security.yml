@@ -20,6 +20,7 @@ env:
 
 jobs:
   patch:
+    # Final rerun after connection-state lint fix.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
