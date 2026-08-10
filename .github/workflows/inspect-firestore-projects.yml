@@ -1,0 +1,47 @@
+name: Inspect Firestore project statuses
+
+on:
+  push:
+    paths:
+      - .github/workflows/inspect-firestore-projects.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print project statuses
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+
+          PROJECT_ID = "seo-project-onboarding-tracker"
+          ROOT = f"https://firestore.googleapis.com/v1/projects/{PROJECT_ID}/databases/(default)/documents"
+
+          def list_documents(collection):
+              url = f"{ROOT}/{collection}?" + urllib.parse.urlencode({"pageSize":"100"})
+              with urllib.request.urlopen(url, timeout=30) as resp:
+                  return json.loads(resp.read().decode()).get("documents", [])
+
+          def s(doc, key):
+              field = doc.get("fields", {}).get(key, {})
+              return field.get("stringValue") or field.get("timestampValue") or ""
+
+          for collection in ("projects", "dmProjects"):
+              docs = list_documents(collection)
+              print(f"COLLECTION {collection} count={len(docs)}")
+              for d in docs:
+                  print(json.dumps({
+                      "id": d["name"].split("/")[-1],
+                      "clientName": s(d,"clientName"),
+                      "status": s(d,"status"),
+                      "completedAt": s(d,"completedAt"),
+                      "assignedTeam": s(d,"assignedTeam"),
+                      "startDate": s(d,"startDate")
+                  }, sort_keys=True))
+          PY
