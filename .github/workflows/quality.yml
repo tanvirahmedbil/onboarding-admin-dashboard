@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-build:
+  lint-build-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -26,5 +26,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run build
